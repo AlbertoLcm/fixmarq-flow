@@ -164,13 +164,14 @@ export default function CreateBudget() {
                 <div className="space-y-3 pr-6">
                   <div>
                     <label className="block text-[10px] text-slate-400 uppercase font-bold tracking-wider mb-1">Descripción del Concepto</label>
-                    <input
-                      type="text"
-                      disabled={isSaving}
+                    <textarea
                       placeholder="Ej. Suministro y colocación de piso cerámico..."
-                      className="w-full bg-transparent border-b border-slate-700/60 py-2 text-white placeholder-slate-600 focus:outline-none focus:border-amber-500 transition-colors text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                      rows={3}
+                      disabled={isSaving}
+                      autoFocus
+                      className="w-full bg-slate-900/60 border border-slate-700/50 rounded-xl px-4 py-3 text-white placeholder-slate-600 focus:outline-none focus:border-amber-500/60 text-sm resize-none"
                       value={item.description}
-                      onChange={e => handleItemChange(item.id!, 'description', e.target.value)}
+                      onChange={(e) => handleItemChange(item.id!, 'description', e.target.value)}
                     />
                   </div>
 
