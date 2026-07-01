@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import {
   ChevronLeft, Download, Briefcase, Calendar, PlusCircle,
   Pencil, Trash2, Save, X, MoreVertical, Package, Hash,
-  Layers, DollarSign, AlertTriangle
+  Layers, DollarSign, AlertTriangle, ChevronUp, ChevronDown
 } from 'lucide-react';
 import { useParams, useNavigate } from 'react-router';
 import { pdf } from '@react-pdf/renderer';
@@ -61,6 +61,36 @@ function BudgetDetailSkeleton() {
   );
 }
 
+// ─── HELPER FUNCTIONS FOR ITEM ORDER PERSISTENCE ────────────────────────────────
+const getSavedItemOrder = (budgetId: string): string[] => {
+  try {
+    const data = localStorage.getItem(`budget_items_order_${budgetId}`);
+    return data ? JSON.parse(data) : [];
+  } catch (e) {
+    return [];
+  }
+};
+
+const saveItemOrder = (budgetId: string, itemIds: string[]) => {
+  try {
+    localStorage.setItem(`budget_items_order_${budgetId}`, JSON.stringify(itemIds));
+  } catch (e) {
+    console.error(e);
+  }
+};
+
+const sortItemsByOrder = (items: BudgetItem[], savedOrder: string[]): BudgetItem[] => {
+  if (!savedOrder || savedOrder.length === 0) return items;
+  return [...items].sort((a, b) => {
+    const idxA = savedOrder.indexOf(a.id || '');
+    const idxB = savedOrder.indexOf(b.id || '');
+    if (idxA === -1 && idxB === -1) return 0;
+    if (idxA === -1) return 1;
+    if (idxB === -1) return -1;
+    return idxA - idxB;
+  });
+};
+
 // ─── EDITOR DE CONCEPTOS ───────────────────────────────────────────────────────
 
 interface BudgetItemsEditorProps {
@@ -83,6 +113,23 @@ function BudgetItemsEditor({ activeBudget, setActiveBudget, mostrarNotificacion 
     document.addEventListener('click', handleOutsideClick);
     return () => document.removeEventListener('click', handleOutsideClick);
   }, [openMenuId]);
+
+  const handleMoveItem = (index: number, direction: 'up' | 'down') => {
+    if (direction === 'up' && index === 0) return;
+    if (direction === 'down' && index === activeBudget.items.length - 1) return;
+
+    const targetIndex = direction === 'up' ? index - 1 : index + 1;
+    const newItems = [...activeBudget.items];
+    const temp = newItems[index];
+    newItems[index] = newItems[targetIndex];
+    newItems[targetIndex] = temp;
+
+    const updatedBudget = { ...activeBudget, items: newItems };
+    setActiveBudget(updatedBudget);
+
+    const itemIds = newItems.map(item => item.id || '');
+    saveItemOrder(activeBudget.id!, itemIds);
+  };
 
   const handleCreateIndividual = () => {
     setModalItem({ description: '', quantity: 1, unit: 'Pza', price: 0, total: 0 });
@@ -108,6 +155,12 @@ function BudgetItemsEditor({ activeBudget, setActiveBudget, mostrarNotificacion 
       await api.delete(`/items/${item.id}`);
       const response = await api.get(`/budgets/${activeBudget.id}`);
       const updatedBudget = response.data;
+      
+      const savedOrder = getSavedItemOrder(updatedBudget.id);
+      const newOrder = savedOrder.filter(id => id !== item.id);
+      saveItemOrder(updatedBudget.id, newOrder);
+      
+      updatedBudget.items = sortItemsByOrder(updatedBudget.items, newOrder);
       setActiveBudget(updatedBudget);
       setBudgets(budgets.map(b => (b.id === updatedBudget.id ? updatedBudget : b)));
       mostrarNotificacion('Concepto eliminado correctamente', 'success');
@@ -147,6 +200,18 @@ function BudgetItemsEditor({ activeBudget, setActiveBudget, mostrarNotificacion 
 
       const response = await api.get(`/budgets/${activeBudget.id}`);
       const updatedBudget = response.data;
+      
+      const savedOrder = getSavedItemOrder(updatedBudget.id);
+      const currentIds = updatedBudget.items.map((it: any) => it.id);
+      const newOrder = savedOrder.filter(id => currentIds.includes(id));
+      currentIds.forEach((id: string) => {
+        if (!newOrder.includes(id)) {
+          newOrder.push(id);
+        }
+      });
+      saveItemOrder(updatedBudget.id, newOrder);
+      
+      updatedBudget.items = sortItemsByOrder(updatedBudget.items, newOrder);
       setActiveBudget(updatedBudget);
       setBudgets(budgets.map(b => (b.id === updatedBudget.id ? updatedBudget : b)));
       setIsItemModalOpen(false);
@@ -216,6 +281,24 @@ function BudgetItemsEditor({ activeBudget, setActiveBudget, mostrarNotificacion 
                       <span className="w-5 h-5 rounded-md bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-[9px] font-black text-amber-400 flex-shrink-0">
                         {idx + 1}
                       </span>
+                      <div className="flex items-center gap-0.5 flex-shrink-0">
+                        <button
+                          onClick={() => handleMoveItem(idx, 'up')}
+                          disabled={idx === 0}
+                          className="p-1 rounded-md text-slate-500 hover:text-amber-500 hover:bg-slate-800 disabled:opacity-30 disabled:pointer-events-none transition-colors"
+                          title="Mover arriba"
+                        >
+                          <ChevronUp className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          onClick={() => handleMoveItem(idx, 'down')}
+                          disabled={idx === activeBudget.items.length - 1}
+                          className="p-1 rounded-md text-slate-500 hover:text-amber-500 hover:bg-slate-800 disabled:opacity-30 disabled:pointer-events-none transition-colors"
+                          title="Mover abajo"
+                        >
+                          <ChevronDown className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
                       <p className="text-sm font-semibold text-slate-200 leading-tight">{item.description}</p>
                     </div>
                     <div className="flex flex-wrap items-center gap-2 mt-2">
@@ -283,10 +366,28 @@ function BudgetItemsEditor({ activeBudget, setActiveBudget, mostrarNotificacion 
               {/* Desktop: fila de tabla */}
               <div className="hidden sm:grid sm:grid-cols-12 gap-2 items-center">
                 {/* Concepto */}
-                <div className="col-span-5 flex items-center gap-3 min-w-0">
+                <div className="col-span-5 flex items-center gap-2.5 min-w-0">
                   <span className="w-6 h-6 rounded-lg bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-[9px] font-black text-amber-400 flex-shrink-0">
                     {idx + 1}
                   </span>
+                  <div className="flex items-center gap-0.5">
+                    <button
+                      onClick={() => handleMoveItem(idx, 'up')}
+                      disabled={idx === 0}
+                      className="p-1 rounded-lg text-slate-500 hover:text-amber-500 hover:bg-slate-800 disabled:opacity-30 disabled:pointer-events-none transition-colors"
+                      title="Mover arriba"
+                    >
+                      <ChevronUp className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                      onClick={() => handleMoveItem(idx, 'down')}
+                      disabled={idx === activeBudget.items.length - 1}
+                      className="p-1 rounded-lg text-slate-500 hover:text-amber-500 hover:bg-slate-800 disabled:opacity-30 disabled:pointer-events-none transition-colors"
+                      title="Mover abajo"
+                    >
+                      <ChevronDown className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
                   <p className="text-sm font-semibold text-slate-200 leading-snug truncate">{item.description}</p>
                 </div>
 
@@ -504,7 +605,12 @@ export default function BudgetDetail() {
       setIsLoading(true);
       try {
         const response = await api.get(`/budgets/${id}`);
-        setActiveBudget(response.data);
+        const budget = response.data;
+        const savedOrder = getSavedItemOrder(budget.id);
+        if (savedOrder.length > 0) {
+          budget.items = sortItemsByOrder(budget.items, savedOrder);
+        }
+        setActiveBudget(budget);
       } catch (error) {
         console.error(error);
       } finally {

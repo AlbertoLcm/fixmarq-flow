@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { PlusCircle, Trash2, Layers } from 'lucide-react';
+import { PlusCircle, Trash2, Layers, ChevronUp, ChevronDown } from 'lucide-react';
 import { useNavigate } from 'react-router';
 import { useBudgets } from '../context/BudgetContext';
 import { THEME, calculateTotal, formatCurrency } from '../constants/theme';
@@ -36,6 +36,17 @@ export default function CreateBudget() {
       }
       return item;
     }));
+  };
+
+  const moveItem = (index: number, direction: 'up' | 'down') => {
+    if (direction === 'up' && index === 0) return;
+    if (direction === 'down' && index === items.length - 1) return;
+    const targetIndex = direction === 'up' ? index - 1 : index + 1;
+    const newItems = [...items];
+    const temp = newItems[index];
+    newItems[index] = newItems[targetIndex];
+    newItems[targetIndex] = temp;
+    setItems(newItems);
   };
 
   const addItem = () => {
@@ -148,18 +159,40 @@ export default function CreateBudget() {
           </div>
 
           <div className="space-y-3">
-            {items.map((item) => (
+            {items.map((item, index) => (
               <div key={item.id} className={`p-4 sm:p-5 rounded-2xl ${THEME.glassCard} relative border-l-4 border-l-amber-500/80`}>
-                {items.length > 1 && (
-                  <button
-                    onClick={() => removeItem(item.id!)}
-                    disabled={isSaving}
-                    className="absolute top-4 right-4 text-slate-500 hover:text-red-400 p-1.5 rounded-lg hover:bg-slate-900/40 transition-colors disabled:opacity-50 disabled:pointer-events-none"
-                    title="Eliminar concepto"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
-                )}
+                <div className="absolute top-4 right-4 flex items-center gap-1">
+                  {index > 0 && (
+                    <button
+                      onClick={() => moveItem(index, 'up')}
+                      disabled={isSaving}
+                      className="text-slate-500 hover:text-amber-500 p-1.5 rounded-lg hover:bg-slate-900/40 transition-colors disabled:opacity-50"
+                      title="Mover arriba"
+                    >
+                      <ChevronUp className="w-4 h-4" />
+                    </button>
+                  )}
+                  {index < items.length - 1 && (
+                    <button
+                      onClick={() => moveItem(index, 'down')}
+                      disabled={isSaving}
+                      className="text-slate-500 hover:text-amber-500 p-1.5 rounded-lg hover:bg-slate-900/40 transition-colors disabled:opacity-50"
+                      title="Mover abajo"
+                    >
+                      <ChevronDown className="w-4 h-4" />
+                    </button>
+                  )}
+                  {items.length > 1 && (
+                    <button
+                      onClick={() => removeItem(item.id!)}
+                      disabled={isSaving}
+                      className="text-slate-500 hover:text-red-400 p-1.5 rounded-lg hover:bg-slate-900/40 transition-colors disabled:opacity-50 disabled:pointer-events-none"
+                      title="Eliminar concepto"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  )}
+                </div>
 
                 <div className="space-y-3 pr-6">
                   <div>
